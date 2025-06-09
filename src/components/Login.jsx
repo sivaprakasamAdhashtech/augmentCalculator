@@ -1,41 +1,45 @@
-import { useState } from 'react'
-import '../styles/Login.css'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
+import { useTimer } from '../hooks/useTimer'
+import { STATIC_CREDENTIALS } from '../utils/auth'
+import Input from './ui/Input'
+import Button from './ui/Button'
 
-const Login = ({ onLogin }) => {
+const Login = () => {
+  const navigate = useNavigate()
+  const { login, isAuthenticated } = useAuth()
+  const { timeLeft, isFinished, startTimer } = useTimer(30)
+
   const [formData, setFormData] = useState({
-    mobileNumber: '',
-    password: ''
+    mobileNumber: STATIC_CREDENTIALS.mobile,
+    otp: ''
   })
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
+  const [showOtpField, setShowOtpField] = useState(false)
 
-  const validateMobileNumber = (mobile) => {
-    // Check if mobile number is exactly 10 digits
-    const mobileRegex = /^[0-9]{10}$/
-    return mobileRegex.test(mobile)
-  }
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/home', { replace: true })
+    }
+  }, [isAuthenticated, navigate])
 
-  const validatePassword = (password) => {
-    // Password should be at least 6 characters
-    return password.length >= 6
-  }
+  // Start timer when OTP field is shown
+  useEffect(() => {
+    if (showOtpField) {
+      startTimer()
+    }
+  }, [showOtpField, startTimer])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    
-    // For mobile number, only allow digits and limit to 10 characters
-    if (name === 'mobileNumber') {
-      const numericValue = value.replace(/[^0-9]/g, '').slice(0, 10)
-      setFormData(prev => ({
-        ...prev,
-        [name]: numericValue
-      }))
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }))
-    }
+
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
 
     // Clear errors when user starts typing
     if (errors[name]) {
@@ -46,42 +50,47 @@ const Login = ({ onLogin }) => {
     }
   }
 
-  const handleSubmit = async (e) => {
+  const handleMobileSubmit = (e) => {
     e.preventDefault()
-    
-    const newErrors = {}
 
-    // Validate mobile number
     if (!formData.mobileNumber) {
-      newErrors.mobileNumber = 'Mobile number is required'
-    } else if (!validateMobileNumber(formData.mobileNumber)) {
-      newErrors.mobileNumber = 'Mobile number must be exactly 10 digits'
-    }
-
-    // Validate password
-    if (!formData.password) {
-      newErrors.password = 'Password is required'
-    } else if (!validatePassword(formData.password)) {
-      newErrors.password = 'Password must be at least 6 characters'
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors)
+      setErrors({ mobileNumber: 'Mobile number is required' })
       return
     }
 
-    // Simulate login process
+    if (formData.mobileNumber !== STATIC_CREDENTIALS.mobile) {
+      setErrors({ mobileNumber: 'Invalid mobile number' })
+      return
+    }
+
+    setShowOtpField(true)
+    setErrors({})
+  }
+
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!formData.otp) {
+      setErrors({ otp: 'OTP is required' })
+      return
+    }
+
+    if (formData.otp.length !== 6) {
+      setErrors({ otp: 'OTP must be 6 digits' })
+      return
+    }
+
     setIsLoading(true)
-    
+    setErrors({})
+
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      // For demo purposes, accept any valid mobile/password combination
-      onLogin({
-        mobileNumber: formData.mobileNumber,
-        isAuthenticated: true
-      })
+      const result = await login(formData.mobileNumber, formData.otp)
+
+      if (result.success) {
+        navigate('/home', { replace: true })
+      } else {
+        setErrors({ general: result.error || 'Invalid credentials. Please try again.' })
+      }
     } catch (error) {
       setErrors({ general: 'Login failed. Please try again.' })
     } finally {
@@ -89,83 +98,133 @@ const Login = ({ onLogin }) => {
     }
   }
 
-  return (
-    <div className="login-container">
-      <div className="login-card">
-        <div className="login-header">
-          <h1>Welcome Back</h1>
-          <p>Sign in to access your calculator</p>
-        </div>
+  const handleResendOtp = () => {
+    console.log('Resend OTP clicked - simulating resend')
+    startTimer()
+    setFormData(prev => ({ ...prev, otp: '' }))
+    setErrors({})
+  }
 
-        <form onSubmit={handleSubmit} className="login-form">
+  const handleBackToMobile = () => {
+    setShowOtpField(false)
+    setFormData(prev => ({ ...prev, otp: '' }))
+    setErrors({})
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 animate-fade-in">
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              {showOtpField ? 'Verify OTP' : 'Welcome Back'}
+            </h1>
+            <p className="text-gray-600">
+              {showOtpField
+                ? `Enter the OTP sent to ${formData.mobileNumber}`
+                : 'Sign in to access your calculator'
+              }
+            </p>
+          </div>
+
+          {/* Error Message */}
           {errors.general && (
-            <div className="error-message general-error">
-              {errors.general}
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg animate-slide-up">
+              <p className="text-red-600 text-sm">{errors.general}</p>
             </div>
           )}
 
-          <div className="form-group">
-            <label htmlFor="mobileNumber" className="form-label">
-              Mobile Number
-            </label>
-            <div className="input-wrapper">
-              <span className="country-code">+91</span>
-              <input
+          {/* Mobile Number Form */}
+          {!showOtpField && (
+            <form onSubmit={handleMobileSubmit} className="space-y-6">
+              <Input
+                label="Mobile Number"
                 type="tel"
-                id="mobileNumber"
                 name="mobileNumber"
                 value={formData.mobileNumber}
                 onChange={handleInputChange}
-                placeholder="Enter 10-digit mobile number"
-                className={`form-input ${errors.mobileNumber ? 'error' : ''}`}
-                maxLength="10"
+                placeholder="Enter mobile number"
+                error={errors.mobileNumber}
+                className="text-lg"
+                readOnly
               />
-            </div>
-            {errors.mobileNumber && (
-              <div className="error-message">
-                {errors.mobileNumber}
+
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+              >
+                Send OTP
+              </Button>
+            </form>
+          )}
+
+          {/* OTP Form */}
+          {showOtpField && (
+            <form onSubmit={handleOtpSubmit} className="space-y-6">
+              <Input
+                label="Enter OTP"
+                type="text"
+                name="otp"
+                value={formData.otp}
+                onChange={handleInputChange}
+                placeholder="123456"
+                error={errors.otp}
+                maxLength="6"
+                className="text-lg text-center tracking-widest"
+                autoFocus
+              />
+
+              {/* Timer and Resend */}
+              <div className="text-center">
+                {!isFinished ? (
+                  <p className="text-gray-600 text-sm">
+                    Resend OTP in <span className="font-semibold text-blue-600">{timeLeft}s</span>
+                  </p>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleResendOtp}
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    Resend OTP
+                  </Button>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="form-group">
-            <label htmlFor="password" className="form-label">
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              placeholder="Enter your password"
-              className={`form-input ${errors.password ? 'error' : ''}`}
-            />
-            {errors.password && (
-              <div className="error-message">
-                {errors.password}
+              <div className="space-y-3">
+                <Button
+                  type="submit"
+                  loading={isLoading}
+                  className="w-full"
+                  size="lg"
+                >
+                  {isLoading ? 'Verifying...' : 'Verify & Login'}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleBackToMobile}
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  Back to Mobile Number
+                </Button>
               </div>
-            )}
+            </form>
+          )}
+
+          {/* Demo Info */}
+          <div className="mt-8 p-4 bg-gray-50 rounded-lg">
+            <p className="text-xs text-gray-600 text-center">
+              <strong>Demo Credentials:</strong><br />
+              Mobile: {STATIC_CREDENTIALS.mobile}<br />
+              OTP: {STATIC_CREDENTIALS.otp}
+            </p>
           </div>
-
-          <button
-            type="submit"
-            className={`login-button ${isLoading ? 'loading' : ''}`}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <span className="spinner"></span>
-                Signing In...
-              </>
-            ) : (
-              'Sign In'
-            )}
-          </button>
-        </form>
-
-        <div className="login-footer">
-          <p>Demo credentials: Any 10-digit mobile number + password (6+ chars)</p>
         </div>
       </div>
     </div>

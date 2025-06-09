@@ -1,36 +1,35 @@
-import { useState } from 'react'
-import Calculator from './components/Calculator'
-import Login from './components/Login'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import LoginPage from './pages/LoginPage'
+import Home from './pages/Home'
+import PrivateRoute from './components/PrivateRoute'
 import './App.css'
 
 function App() {
-  const [user, setUser] = useState(null)
-
-  const handleLogin = (userData) => {
-    setUser(userData)
-  }
-
-  const handleLogout = () => {
-    setUser(null)
-  }
-
-  if (!user) {
-    return <Login onLogin={handleLogin} />
-  }
-
   return (
-    <div className="app">
-      <div className="app-header">
-        <h1>React Calculator</h1>
-        <div className="user-info">
-          <span>Welcome, +91 {user.mobileNumber}</span>
-          <button onClick={handleLogout} className="logout-button">
-            Logout
-          </button>
-        </div>
+    <Router>
+      <div className="app">
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/login" element={<LoginPage />} />
+
+          {/* Protected Routes */}
+          <Route
+            path="/home"
+            element={
+              <PrivateRoute>
+                <Home />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Default redirect */}
+          <Route path="/" element={<Navigate to="/home" replace />} />
+
+          {/* Catch all - redirect to home */}
+          <Route path="*" element={<Navigate to="/home" replace />} />
+        </Routes>
       </div>
-      <Calculator />
-    </div>
+    </Router>
   )
 }
 
